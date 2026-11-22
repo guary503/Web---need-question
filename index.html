@@ -55,6 +55,7 @@ const inicio = performance.now();
 let visibleDesde = document.visibilityState === "visible" ? inicio : null;
 let msVisible = 0;
 let segundosVideo = 0, reproduciendoDesde = null, clicEnviado = false, cerrado = false;
+let player = null, duracionVideo = 0, avanceMax = 0;
 
 function tiempos() {
   const ahora = performance.now();
@@ -65,8 +66,21 @@ function tiempos() {
            segundosVideo: Math.round(vid) };
 }
 
+function estadoVideo() {
+  if (player && player.getCurrentTime) {
+    try {
+      const pos = player.getCurrentTime() || 0;
+      const dur = player.getDuration() || 0;
+      if (pos > avanceMax) avanceMax = pos;
+      if (dur) duracionVideo = dur;
+    } catch (e) {}
+  }
+  const pct = duracionVideo ? Math.min(100, Math.round(avanceMax / duracionVideo * 100)) : 0;
+  return { duracionVideo: Math.round(duracionVideo), avanceMax: Math.round(avanceMax), porcentaje: pct };
+}
+
 function enviar(tipo, extra = {}) {
-  const datos = JSON.stringify({ id, tipo, ...tiempos(), ...extra });
+  const datos = JSON.stringify({ id, tipo, ...tiempos(), ...estadoVideo(), ...extra });
   // text/plain evita el bloqueo CORS de Google Apps Script
   const blob = new Blob([datos], { type: "text/plain;charset=utf-8" });
   if (!(navigator.sendBeacon && navigator.sendBeacon(SCRIPT_URL, blob))) {
@@ -139,8 +153,8 @@ addEventListener("pagehide", cerrar);
 addEventListener("beforeunload", cerrar);
 addEventListener("pageshow", e => { if (e.persisted) { cerrado = false; enviar("visible"); } });
 
-// Señal cada 20 s: si el cierre no llega, la hoja conserva la última señal
-setInterval(() => { if (!cerrado) enviar("latido"); }, 20000);
+// Señal cada 8 s: mantiene al día el tiempo/avance del video y el cierre aproximado
+setInterval(() => { if (!cerrado) enviar("latido"); }, 8000);
 
 /* ---------- Reproductor de YouTube ---------- */
 const tag = document.createElement("script");
@@ -148,7 +162,7 @@ tag.src = "https://www.youtube.com/iframe_api";
 document.head.appendChild(tag);
 
 function onYouTubeIframeAPIReady() {
-  new YT.Player("reproductor", {
+  player = new YT.Player("reproductor", {
     videoId: VIDEO_ID,
     playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
     events: { onStateChange: e => {
