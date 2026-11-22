@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 18px; padding: 20px;
+    background: radial-gradient(circle at 50% 30%, #1d2230, #0b0d12 70%);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #e8e8ea;
+  }
+  h1 { margin: 0; font-weight: 600; font-size: clamp(1.2rem, 3vw, 1.8rem); letter-spacing: .02em; }
+  .marco {
+    width: min(960px, 100%); aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden;
+    background: #000; box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  }
+  .marco > div, .marco iframe { width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+  <h1 id="titulo">Video</h1>
+  <div class="marco"><div id="reproductor"></div></div>
+
+<script>
+/* ====== CONFIGURA AQUÍ ====== */
+const VIDEO_ID   = "TwfVGy_HMXQ";          // lo que va después de ?v= o youtu.be/
+const TITULO     = "Video";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw0jO-YBg9NeW6dTqhvZcHCvgM5KCDb9uGRqDon3U6u8eGKcKWDeCSVpJ7EE0hRppPc/exec";
+/* ============================ */
+
+document.getElementById("titulo").textContent = TITULO;
+document.title = TITULO;
+
+const id = crypto.randomUUID ? crypto.randomUUID()
+  : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); });
+
+const inicio = performance.now();
+let visibleDesde = document.visibilityState === "visible" ? inicio : null;
+let msVisible = 0;
+let segundosVideo = 0, reproduciendoDesde = null, clicEnviado = false, cerrado = false;
+
+function tiempos() {
+  const ahora = performance.now();
+  const vis = msVisible + (visibleDesde !== null ? ahora - visibleDesde : 0);
+  const vid = segundosVideo + (reproduciendoDesde !== null ? (ahora - reproduciendoDesde) / 1000 : 0);
+  return { tiempoTotal: Math.round((ahora - inicio) / 1000),
+           tiempoVisible: Math.round(vis / 1000),
+           segundosVideo: Math.round(vid) };
+}
+
+function enviar(tipo, extra = {}) {
+  const datos = JSON.stringify({ id, tipo, ...tiempos(), ...extra });
+  // text/plain evita el bloqueo CORS de Google Apps Script
+  const blob = new Blob([datos], { type: "text/plain;charset=utf-8" });
+  if (!(navigator.sendBeacon && navigator.sendBeacon(SCRIPT_URL, blob))) {
+    fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", keepalive: true,
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, body: datos }).catch(() => {});
+  }
+}
+
+/* ---------- Especificaciones del dispositivo ---------- */
+async function datosDispositivo() {
+  const ua = navigator.userAgent;
+  const d = {
+    userAgent: ua,
+    pantalla: `${screen.width}x${screen.height}`,
+    ventana: `${innerWidth}x${innerHeight}`,
+    densidad: devicePixelRatio,
+    nucleos: navigator.hardwareConcurrency,
+    memoriaGB: navigator.deviceMemory,
+    tactil: navigator.maxTouchPoints > 0 ? "sí" : "no",
+    idioma: navigator.language,
+    zonaHoraria: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    conexion: navigator.connection ? `${navigator.connection.effectiveType || ""} ${navigator.connection.downlink ? navigator.connection.downlink + " Mbps" : ""}`.trim() : "",
+    referencia: document.referrer || "(directo)",
+  };
+  d.sistema = /Windows/.test(ua) ? "Windows" : /Android/.test(ua) ? "Android"
+    : /iPhone|iPad|iPod/.test(ua) ? "iOS" : /Mac OS X/.test(ua) ? "macOS"
+    : /CrOS/.test(ua) ? "ChromeOS" : /Linux/.test(ua) ? "Linux" : "Otro";
+  d.navegador = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera"
+    : /SamsungBrowser/.test(ua) ? "Samsung Internet" : /Firefox\//.test(ua) ? "Firefox"
+    : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "Otro";
+  const m = ua.match(/(?:Edg|OPR|SamsungBrowser|Firefox|Chrome|Version)\/([\d.]+)/);
+  if (m) d.navegador += " " + m[1].split(".")[0];
+  const and = ua.match(/Android ([\d.]+);\s*([^;)]+)/);
+  if (and) { d.versionSistema = and[1]; if (and[2].trim() !== "K") d.modelo = and[2].trim(); }
+  const ios = ua.match(/OS (\d+[_\d]*) like Mac/);
+  if (ios) { d.versionSistema = ios[1].replace(/_/g, "."); d.modelo = /iPad/.test(ua) ? "iPad" : "iPhone"; }
+  d.tipo = /iPad|Tablet/.test(ua) || (/Android/.test(ua) && !/Mobile/.test(ua)) ? "Tablet"
+    : /Mobi|iPhone|Android/.test(ua) ? "Celular" : "Computadora";
+
+  const tareas = [];
+  if (navigator.userAgentData?.getHighEntropyValues) {
+    tareas.push(navigator.userAgentData.getHighEntropyValues(["model", "platformVersion"])
+      .then(h => {
+        if (h.model) d.modelo = h.model;
+        if (h.platformVersion) d.versionSistema = d.sistema === "Windows"
+          ? (parseInt(h.platformVersion) >= 13 ? "11" : "10") : h.platformVersion;
+      }).catch(() => {}));
+  }
+  // IP pública (Google Apps Script no la recibe por sí solo)
+  tareas.push(fetch("https://api.ipify.org?format=json").then(r => r.json())
+    .then(j => { d.ip = j.ip; }).catch(() => {}));
+  await Promise.race([Promise.all(tareas), new Promise(r => setTimeout(r, 3000))]);
+  return d;
+}
+
+datosDispositivo().then(dispositivo => enviar("entrada", { dispositivo }));
+
+/* ---------- Tiempo visible / cierre ---------- */
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    if (visibleDesde !== null) { msVisible += performance.now() - visibleDesde; visibleDesde = null; }
+    enviar("oculta");
+  } else {
+    visibleDesde = performance.now();
+    if (!cerrado) enviar("visible");
+  }
+});
+function cerrar() { if (cerrado) return; cerrado = true; enviar("cierre"); }
+addEventListener("pagehide", cerrar);
+addEventListener("beforeunload", cerrar);
+addEventListener("pageshow", e => { if (e.persisted) { cerrado = false; enviar("visible"); } });
+
+// Señal cada 20 s: si el cierre no llega, la hoja conserva la última señal
+setInterval(() => { if (!cerrado) enviar("latido"); }, 20000);
+
+/* ---------- Reproductor de YouTube ---------- */
+const tag = document.createElement("script");
+tag.src = "https://www.youtube.com/iframe_api";
+document.head.appendChild(tag);
+
+function onYouTubeIframeAPIReady() {
+  new YT.Player("reproductor", {
+    videoId: VIDEO_ID,
+    playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
+    events: { onStateChange: e => {
+      if (e.data === YT.PlayerState.PLAYING) {
+        if (reproduciendoDesde === null) reproduciendoDesde = performance.now();
+        if (!clicEnviado) { clicEnviado = true; enviar("clic_video"); }
+      } else if (reproduciendoDesde !== null) {
+        segundosVideo += (performance.now() - reproduciendoDesde) / 1000;
+        reproduciendoDesde = null;
+        if (e.data === YT.PlayerState.ENDED) enviar("video_terminado");
+      }
+    }}
+  });
+}
+</script>
+</body>
+</html>
