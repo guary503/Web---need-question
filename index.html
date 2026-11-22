@@ -120,6 +120,18 @@ async function datosDispositivo() {
   d.tipo = /iPad|Tablet/.test(ua) || (/Android/.test(ua) && !/Mobile/.test(ua)) ? "Tablet"
     : /Mobi|iPhone|Android/.test(ua) ? "Celular" : "Computadora";
 
+  // Detección de bots (robots de internet que ejecutan la página)
+  const razonesBot = [];
+  if (navigator.webdriver) razonesBot.push("navegador automatizado");
+  if (/bot|spider|crawl|headless|slurp|python-requests|curl|wget|facebookexternalhit|whatsapp|slackbot|telegrambot|bytespider|ia_archiver|bingpreview|embedly|preview|lighthouse|monitor/i.test(ua))
+    razonesBot.push("user-agent de robot");
+  const esMovil = /Mobi|iPhone|Android/i.test(ua);
+  if (esMovil && navigator.maxTouchPoints === 0) razonesBot.push("dice ser móvil pero sin pantalla táctil");
+  if (esMovil && Math.min(screen.width, screen.height) >= 1000) razonesBot.push("dice ser móvil pero con pantalla de escritorio");
+  if (!navigator.languages || navigator.languages.length === 0) razonesBot.push("sin idiomas configurados");
+  d.bot = razonesBot.length ? "SÍ" : "no";
+  d.botMotivo = razonesBot.join("; ");
+
   const tareas = [];
   if (navigator.userAgentData?.getHighEntropyValues) {
     tareas.push(navigator.userAgentData.getHighEntropyValues(["model", "platformVersion"])
