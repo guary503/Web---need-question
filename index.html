@@ -5,27 +5,69 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Video</title>
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    color-scheme: dark;
+    --fg: #eef1f6; --muted: #9aa3b2; --line: rgba(255,255,255,.09); --accent: #ff2d55;
+  }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
-    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 18px; padding: 20px;
-    background: radial-gradient(circle at 50% 30%, #1d2230, #0b0d12 70%);
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #e8e8ea;
+    margin: 0; min-height: 100dvh;
+    display: flex; align-items: center; justify-content: center;
+    padding: max(22px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+             max(22px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    background:
+      radial-gradient(1100px 560px at 50% -12%, rgba(255,45,85,.12), transparent 60%),
+      radial-gradient(900px 520px at 50% 118%, rgba(70,100,180,.16), transparent 62%),
+      linear-gradient(165deg, #141a24, #0a0c10);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--fg); -webkit-font-smoothing: antialiased;
   }
-  h1 { margin: 0; font-weight: 600; font-size: clamp(1.2rem, 3vw, 1.8rem); letter-spacing: .02em; }
-  .marco {
-    width: min(960px, 100%); aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden;
-    background: #000; box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  .wrap { width: 100%; max-width: 920px; display: flex; flex-direction: column; gap: 18px; }
+  .card {
+    border-radius: 18px; overflow: hidden; background: #000;
+    border: 1px solid var(--line);
+    box-shadow: 0 30px 80px -24px rgba(0,0,0,.85);
   }
-  .marco > div, .marco iframe { width: 100%; height: 100%; display: block; }
-  /* Video vertical (Shorts / grabado con el celular) */
-  .marco.vertical { width: min(100%, calc(85vh * 9 / 16)); aspect-ratio: 9 / 16; }
+  .marco { width: 100%; aspect-ratio: 16 / 9; }
+  .marco > div, .marco iframe { width: 100%; height: 100%; display: block; border: 0; }
+  /* Video vertical (Shorts / grabado con el celular): la tarjeta se angosta */
+  .wrap.vertical .card { width: min(100%, calc(78dvh * 9 / 16)); margin-inline: auto; }
+  .wrap.vertical .marco { aspect-ratio: 9 / 16; }
+  .meta { text-align: center; padding: 0 6px; }
+  #titulo {
+    margin: 0; font-weight: 650; line-height: 1.25; letter-spacing: .01em;
+    font-size: clamp(1.05rem, 2.4vw, 1.5rem);
+  }
+  .canal {
+    margin: .45rem 0 0; color: var(--muted); font-size: .9rem;
+    display: flex; gap: .5rem; align-items: center; justify-content: center;
+  }
+  .canal:empty { display: none; }
+  .canal::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 10px var(--accent);
+  }
+  @media (max-width: 480px) {
+    .card { border-radius: 14px; }
+    .wrap { gap: 14px; }
+  }
+  /* Celular acostado: aprovechar el ancho, ocultar textos */
+  @media (orientation: landscape) and (max-height: 520px) {
+    body { padding: 10px; }
+    .wrap { max-width: calc(128dvh * 16 / 9); gap: 0; }
+    .meta { display: none; }
+  }
 </style>
 </head>
 <body>
-  <h1 id="titulo">Video</h1>
-  <div class="marco"><div id="reproductor"></div></div>
+  <main class="wrap">
+    <div class="card"><div class="marco"><div id="reproductor"></div></div></div>
+    <div class="meta">
+      <h1 id="titulo">Video</h1>
+      <p id="canal" class="canal"></p>
+    </div>
+  </main>
 
 <script>
 /* ====== CONFIGURA AQUÍ ====== */
@@ -35,17 +77,22 @@ const ORIENTACION = "auto";                     // "auto", "vertical" u "horizon
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw0jO-YBg9NeW6dTqhvZcHCvgM5KCDb9uGRqDon3U6u8eGKcKWDeCSVpJ7EE0hRppPc/exec";
 /* ============================ */
 
-document.getElementById("titulo").textContent = TITULO;
 document.title = TITULO;
+const wrap = document.querySelector(".wrap");
+const elTitulo = document.getElementById("titulo");
+const elCanal = document.getElementById("canal");
+elTitulo.textContent = TITULO;
+if (ORIENTACION === "vertical") wrap.classList.add("vertical");
 
-// Ajusta el marco a la forma del video
-const marco = document.querySelector(".marco");
-if (ORIENTACION === "vertical") marco.classList.add("vertical");
-else if (ORIENTACION === "auto") {
-  fetch("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent("https://www.youtube.com/watch?v=" + VIDEO_ID))
-    .then(r => r.json()).then(j => { if (j.height > j.width) marco.classList.add("vertical"); })
-    .catch(() => {});
-}
+// Trae de YouTube el título, el canal y la forma (vertical/horizontal) del video
+fetch("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent("https://www.youtube.com/watch?v=" + VIDEO_ID))
+  .then(r => r.json())
+  .then(j => {
+    if (TITULO === "Video" && j.title) { elTitulo.textContent = j.title; document.title = j.title; }
+    if (j.author_name) elCanal.textContent = j.author_name;
+    if (ORIENTACION === "auto" && j.height > j.width) wrap.classList.add("vertical");
+  })
+  .catch(() => {});
 
 const id = crypto.randomUUID ? crypto.randomUUID()
   : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
