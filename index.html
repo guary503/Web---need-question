@@ -58,9 +58,44 @@
     .wrap { max-width: calc(128dvh * 16 / 9); gap: 0; }
     .meta { display: none; }
   }
+  /* Aviso previo con botón Continuar */
+  .aviso {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: center;
+    padding: max(22px, env(safe-area-inset-top)) 20px max(22px, env(safe-area-inset-bottom));
+    background: rgba(8,10,14,.72);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  }
+  .aviso.oculto { display: none; }
+  .aviso-card {
+    width: min(440px, 100%); text-align: center;
+    background: linear-gradient(165deg, #171d28, #0e121a);
+    border: 1px solid var(--line); border-radius: 18px;
+    padding: 30px 26px; box-shadow: 0 30px 80px -24px rgba(0,0,0,.85);
+  }
+  .aviso-icono { font-size: 2.4rem; line-height: 1; }
+  .aviso-card h2 { margin: 12px 0 8px; font-size: 1.25rem; font-weight: 650; }
+  .aviso-card p { margin: 0 0 22px; color: var(--muted); line-height: 1.5; }
+  #btnContinuar {
+    appearance: none; -webkit-appearance: none; border: 0; cursor: pointer;
+    background: var(--accent); color: #fff; font: inherit; font-weight: 650;
+    padding: 13px 30px; border-radius: 12px; width: 100%;
+    box-shadow: 0 10px 30px -8px var(--accent);
+    transition: transform .06s ease, filter .15s ease;
+  }
+  #btnContinuar:hover { filter: brightness(1.08); }
+  #btnContinuar:active { transform: translateY(1px); }
 </style>
 </head>
 <body>
+  <div id="aviso" class="aviso">
+    <div class="aviso-card">
+      <div class="aviso-icono">⏳</div>
+      <h2>Antes de continuar</h2>
+      <p>El siguiente video es <strong>largo, muy largo</strong>. Tómate un tiempo prudencial para verlo con calma.</p>
+      <button id="btnContinuar">Continuar</button>
+    </div>
+  </div>
   <main class="wrap">
     <div class="card"><div class="marco"><div id="reproductor"></div></div></div>
     <div class="meta">
@@ -98,11 +133,12 @@ const id = crypto.randomUUID ? crypto.randomUUID()
   : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
       const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); });
 
-const inicio = performance.now();
-let visibleDesde = document.visibilityState === "visible" ? inicio : null;
+let continuado = false, inicio = 0;
+let visibleDesde = null;
 let msVisible = 0;
 let segundosVideo = 0, reproduciendoDesde = null, clicEnviado = false, cerrado = false;
 let player = null, duracionVideo = 0, avanceMax = 0;
+let apiLista = false, pendienteCrear = false;
 
 function tiempos() {
   const ahora = performance.now();
@@ -127,6 +163,7 @@ function estadoVideo() {
 }
 
 function enviar(tipo, extra = {}) {
+  if (!continuado) return;   // nada se registra hasta que dan "Continuar"
   const datos = JSON.stringify({ id, tipo, ...tiempos(), ...estadoVideo(), ...extra });
   // text/plain evita el bloqueo CORS de Google Apps Script
   const blob = new Blob([datos], { type: "text/plain;charset=utf-8" });
@@ -195,7 +232,22 @@ async function datosDispositivo() {
   return d;
 }
 
-datosDispositivo().then(dispositivo => enviar("entrada", { dispositivo }));
+// Los datos del dispositivo se preparan al cargar; el registro y la notificación
+// se envían solo cuando la persona da "Continuar".
+const promesaDatos = datosDispositivo();
+
+async function continuar() {
+  if (continuado) return;
+  continuado = true;
+  inicio = performance.now();
+  visibleDesde = document.visibilityState === "visible" ? inicio : null;
+  document.getElementById("aviso").classList.add("oculto");
+  const dispositivo = await promesaDatos;
+  enviar("entrada", { dispositivo });
+  setInterval(() => { if (!cerrado) enviar("latido"); }, 8000);
+  if (apiLista) crearPlayer(); else pendienteCrear = true;
+}
+document.getElementById("btnContinuar").addEventListener("click", continuar);
 
 /* ---------- Tiempo visible / cierre ---------- */
 document.addEventListener("visibilitychange", () => {
@@ -212,15 +264,16 @@ addEventListener("pagehide", cerrar);
 addEventListener("beforeunload", cerrar);
 addEventListener("pageshow", e => { if (e.persisted) { cerrado = false; enviar("visible"); } });
 
-// Señal cada 8 s: mantiene al día el tiempo/avance del video y el cierre aproximado
-setInterval(() => { if (!cerrado) enviar("latido"); }, 8000);
-
 /* ---------- Reproductor de YouTube ---------- */
 const tag = document.createElement("script");
 tag.src = "https://www.youtube.com/iframe_api";
 document.head.appendChild(tag);
 
 function onYouTubeIframeAPIReady() {
+  apiLista = true;
+  if (pendienteCrear) crearPlayer();
+}
+function crearPlayer() {
   player = new YT.Player("reproductor", {
     videoId: VIDEO_ID,
     playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
