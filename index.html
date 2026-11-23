@@ -85,6 +85,17 @@
   }
   #btnContinuar:hover { filter: brightness(1.08); }
   #btnContinuar:active { transform: translateY(1px); }
+  /* Modo grande al reproducir (pensado para móvil / iPad) */
+  .card.grande { position: fixed; inset: 0; z-index: 30; width: 100%; border: 0; border-radius: 0; background: #000; display: flex; align-items: center; justify-content: center; }
+  .card.grande .marco { width: 100vw; height: 100dvh; aspect-ratio: auto; }
+  .btn-cerrar-grande {
+    position: fixed; z-index: 31; display: none;
+    top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right));
+    width: 42px; height: 42px; border-radius: 50%; border: 0; cursor: pointer;
+    background: rgba(0,0,0,.55); color: #fff; font-size: 20px; line-height: 1;
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  }
+  body.grande-activa .btn-cerrar-grande { display: block; }
 </style>
 </head>
 <body>
@@ -103,6 +114,7 @@
       <p id="canal" class="canal"></p>
     </div>
   </main>
+  <button id="cerrarGrande" class="btn-cerrar-grande" aria-label="Cerrar pantalla grande">✕</button>
 
 <script>
 /* ====== CONFIGURA AQUÍ ====== */
@@ -264,6 +276,29 @@ addEventListener("pagehide", cerrar);
 addEventListener("beforeunload", cerrar);
 addEventListener("pageshow", e => { if (e.persisted) { cerrado = false; enviar("visible"); } });
 
+/* ---------- Pantalla grande al reproducir ---------- */
+const tarjeta = document.querySelector(".card");
+const btnCerrarGrande = document.getElementById("cerrarGrande");
+function agrandar() {
+  if (tarjeta.classList.contains("grande")) return;
+  tarjeta.classList.add("grande");
+  document.body.classList.add("grande-activa");
+  const pedir = tarjeta.requestFullscreen || tarjeta.webkitRequestFullscreen;
+  if (pedir) { try { const pr = pedir.call(tarjeta); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {} }
+}
+function achicar() {
+  tarjeta.classList.remove("grande");
+  document.body.classList.remove("grande-activa");
+  const salir = document.exitFullscreen || document.webkitExitFullscreen;
+  if ((document.fullscreenElement || document.webkitFullscreenElement) && salir) { try { salir.call(document); } catch (e) {} }
+}
+btnCerrarGrande.addEventListener("click", achicar);
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    tarjeta.classList.remove("grande"); document.body.classList.remove("grande-activa");
+  }
+});
+
 /* ---------- Reproductor de YouTube ---------- */
 const tag = document.createElement("script");
 tag.src = "https://www.youtube.com/iframe_api";
@@ -281,10 +316,11 @@ function crearPlayer() {
       if (e.data === YT.PlayerState.PLAYING) {
         if (reproduciendoDesde === null) reproduciendoDesde = performance.now();
         if (!clicEnviado) { clicEnviado = true; enviar("clic_video"); }
+        agrandar();
       } else if (reproduciendoDesde !== null) {
         segundosVideo += (performance.now() - reproduciendoDesde) / 1000;
         reproduciendoDesde = null;
-        if (e.data === YT.PlayerState.ENDED) enviar("video_terminado");
+        if (e.data === YT.PlayerState.ENDED) { enviar("video_terminado"); achicar(); }
       }
     }}
   });
