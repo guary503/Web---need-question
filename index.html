@@ -10,7 +10,7 @@
     --fg: #eef1f6; --muted: #9aa3b2; --line: rgba(255,255,255,.09); --accent: #ff2d55;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
+  html { height: 100%; }
   body {
     margin: 0; min-height: 100dvh;
     display: flex; align-items: center; justify-content: center;
@@ -96,6 +96,66 @@
     -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
   }
   body.grande-activa .btn-cerrar-grande { display: block; }
+
+  /* ---------- Cupones ---------- */
+  .cupones { margin-top: 10px; }
+  .cupones-head { text-align: center; padding: 0 6px; }
+  .cupones-head h2 { margin: 0; font-weight: 650; font-size: clamp(1.05rem, 2.2vw, 1.3rem); }
+  .cupones-head p { margin: .4rem 0 0; color: var(--muted); font-size: .92rem; }
+  .cupones-grid {
+    display: grid; gap: 14px; margin-top: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+  .cupon {
+    position: relative; display: flex; flex-direction: column; gap: 4px;
+    padding: 16px 18px 14px; border-radius: 16px;
+    background: linear-gradient(160deg, #222b3b, #141a25);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.07);
+    /* muescas de ticket a los lados */
+    -webkit-mask: radial-gradient(circle 11px at left center, #0000 98%, #000) left / 51% 100% no-repeat,
+                  radial-gradient(circle 11px at right center, #0000 98%, #000) right / 51% 100% no-repeat;
+            mask: radial-gradient(circle 11px at left center, #0000 98%, #000) left / 51% 100% no-repeat,
+                  radial-gradient(circle 11px at right center, #0000 98%, #000) right / 51% 100% no-repeat;
+  }
+  .cupon-emoji { font-size: 1.9rem; line-height: 1; }
+  .cupon h3 { margin: 8px 0 0; font-size: 1rem; font-weight: 650; line-height: 1.3; flex: 1; }
+  .cupon p { margin: 0; color: var(--muted); font-size: .9rem; line-height: 1.45; flex: 1; }
+  .cupon .linea { border-top: 1.5px dashed rgba(255,255,255,.14); margin: 12px -4px 0; }
+  .canjear {
+    appearance: none; -webkit-appearance: none; cursor: pointer; font: inherit; font-weight: 650;
+    margin-top: 12px; padding: 10px; width: 100%; border-radius: 10px;
+    background: rgba(255,45,85,.13); color: #ff7b93; border: 1px solid rgba(255,45,85,.45);
+    transition: background .15s ease, transform .06s ease;
+  }
+  .canjear:hover { background: rgba(255,45,85,.22); }
+  .canjear:active { transform: translateY(1px); }
+  .sello {
+    display: none; position: absolute; top: 14px; right: 12px; transform: rotate(10deg);
+    border: 2px solid #34d399; color: #34d399; border-radius: 6px;
+    padding: 3px 8px; font-size: .68rem; font-weight: 800; letter-spacing: .14em;
+  }
+  .cupon.canjeado .sello { display: block; }
+  .cupon.canjeado .canjear { cursor: default; background: transparent; color: var(--muted); border-color: var(--line); }
+  .cupon.suave { background: linear-gradient(160deg, #1c222d, #12161e); }
+  .cupon.suave .canjear { background: transparent; color: var(--muted); border-color: rgba(255,255,255,.18); }
+
+  /* Ventana para confirmar el canje */
+  .modal-cupon .aviso-card { text-align: left; }
+  .modal-cupon .aviso-icono, .modal-cupon h2 { text-align: center; }
+  .modal-cupon p { text-align: center; margin-bottom: 16px; }
+  .modal-cupon textarea {
+    width: 100%; min-height: 92px; resize: vertical; font: inherit; color: var(--fg);
+    background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px; outline: none;
+  }
+  .modal-cupon textarea:focus { border-color: rgba(255,45,85,.6); }
+  .modal-botones { display: flex; gap: 10px; margin-top: 14px; }
+  .modal-botones button {
+    flex: 1; appearance: none; -webkit-appearance: none; cursor: pointer; font: inherit; font-weight: 650;
+    padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: transparent; color: var(--fg);
+  }
+  .modal-botones .principal { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .modal-cupon.listo textarea, .modal-cupon.listo #btnMejorNo { display: none; }
 </style>
 </head>
 <body>
@@ -113,7 +173,27 @@
       <h1 id="titulo">Video</h1>
       <p id="canal" class="canal"></p>
     </div>
+    <section class="cupones" aria-label="Cupones">
+      <div class="cupones-head">
+        <h2>🎟️ Cupones</h2>
+        <p>Por si algún día te dan ganas. Sin presión, jeje.</p>
+      </div>
+      <div id="cuponesGrid" class="cupones-grid"></div>
+    </section>
   </main>
+
+  <div id="modalCupon" class="aviso modal-cupon oculto" role="dialog" aria-modal="true">
+    <div class="aviso-card">
+      <div id="mcEmoji" class="aviso-icono">🎟️</div>
+      <h2 id="mcTitulo">¿Canjear este cupón?</h2>
+      <p id="mcTexto"></p>
+      <textarea id="mcNota" maxlength="1000" placeholder="¿Querés decirme algo? (opcional)"></textarea>
+      <div class="modal-botones">
+        <button id="btnMejorNo">Mejor no</button>
+        <button id="btnCanjear" class="principal">Sí, canjear</button>
+      </div>
+    </div>
+  </div>
   <button id="cerrarGrande" class="btn-cerrar-grande" aria-label="Cerrar pantalla grande">✕</button>
 
 <script>
@@ -297,6 +377,79 @@ document.addEventListener("fullscreenchange", () => {
   if (!document.fullscreenElement && !document.webkitFullscreenElement) {
     tarjeta.classList.remove("grande"); document.body.classList.remove("grande-activa");
   }
+});
+
+/* ---------- Cupones ---------- */
+// Edita aquí los cupones (emoji y título) y el mensaje que ve al canjear.
+const GRACIAS = "¡Listo! Ya me llegó el aviso. Vos decís cuándo 😊";
+const CUPONES = [
+  { emoji: "☕", titulo: "Vale por un café" },
+  { emoji: "🚶", titulo: "Vale por una caminata" },
+  { emoji: "🍦", titulo: "Vale por un helado" },
+  { emoji: "🍽️", titulo: "Vale por una cena" },
+  { emoji: "🎬", titulo: "Vale por una salida al cine" },
+  { emoji: "🎷", titulo: "Vale por una canción en saxo" },
+  { emoji: "💬", titulo: "Vale por una plática donde solo escucho" },
+  { emoji: "🪂", titulo: "Vale por una experiencia extrema" },
+];
+
+const CLAVE_CANJE = "cupones-canjeados";
+function leerCanjes() { try { return JSON.parse(localStorage.getItem(CLAVE_CANJE)) || []; } catch (e) { return []; } }
+function guardarCanje(t) {
+  try { const l = leerCanjes(); if (!l.includes(t)) l.push(t); localStorage.setItem(CLAVE_CANJE, JSON.stringify(l)); } catch (e) {}
+}
+
+const grid = document.getElementById("cuponesGrid");
+const modal = document.getElementById("modalCupon");
+const mcEmoji = document.getElementById("mcEmoji"), mcTitulo = document.getElementById("mcTitulo");
+const mcTexto = document.getElementById("mcTexto"), mcNota = document.getElementById("mcNota");
+const btnCanjear = document.getElementById("btnCanjear"), btnMejorNo = document.getElementById("btnMejorNo");
+let cuponActivo = null, tarjetaActiva = null;
+
+function marcarCanjeado(el) {
+  el.classList.add("canjeado");
+  const b = el.querySelector(".canjear"); b.textContent = "Canjeado ✓"; b.disabled = true;
+}
+
+const yaCanjeados = leerCanjes();
+CUPONES.forEach(c => {
+  const el = document.createElement("article");
+  el.className = "cupon" + (c.suave ? " suave" : "");
+  const em = document.createElement("div"); em.className = "cupon-emoji"; em.textContent = c.emoji;
+  const h = document.createElement("h3"); h.textContent = c.titulo;
+  const ln = document.createElement("div"); ln.className = "linea";
+  const b = document.createElement("button"); b.className = "canjear"; b.textContent = "Canjear";
+  const s = document.createElement("span"); s.className = "sello"; s.textContent = "CANJEADO";
+  el.append(s, em, h, ln, b);
+  b.addEventListener("click", () => abrirCupon(c, el));
+  if (yaCanjeados.includes(c.titulo)) marcarCanjeado(el);
+  grid.appendChild(el);
+});
+
+function abrirCupon(c, el) {
+  if (el.classList.contains("canjeado")) return;
+  cuponActivo = c; tarjetaActiva = el;
+  modal.classList.remove("listo");
+  mcEmoji.textContent = c.emoji;
+  mcTitulo.textContent = "¿Canjear este cupón?";
+  mcTexto.textContent = c.titulo;
+  mcNota.value = "";
+  btnCanjear.textContent = "Sí, canjear";
+  modal.classList.remove("oculto");
+}
+function cerrarModal() { modal.classList.add("oculto"); cuponActivo = null; tarjetaActiva = null; }
+btnMejorNo.addEventListener("click", cerrarModal);
+modal.addEventListener("click", e => { if (e.target === modal) cerrarModal(); });
+btnCanjear.addEventListener("click", () => {
+  if (modal.classList.contains("listo")) { cerrarModal(); return; }
+  if (!cuponActivo) return;
+  enviar("cupon", { cupon: cuponActivo.titulo, nota: mcNota.value.trim().slice(0, 1000) });
+  guardarCanje(cuponActivo.titulo);
+  marcarCanjeado(tarjetaActiva);
+  modal.classList.add("listo");
+  mcTitulo.textContent = "¡Cupón canjeado!";
+  mcTexto.textContent = cuponActivo.gracias || GRACIAS;
+  btnCanjear.textContent = "Cerrar";
 });
 
 /* ---------- Reproductor de YouTube ---------- */
