@@ -257,12 +257,14 @@ function estadoVideo() {
 function enviar(tipo, extra = {}) {
   if (!continuado) return;   // nada se registra hasta que dan "Continuar"
   const datos = JSON.stringify({ id, tipo, ...tiempos(), ...estadoVideo(), ...extra });
-  // text/plain evita el bloqueo CORS de Google Apps Script
-  const blob = new Blob([datos], { type: "text/plain;charset=utf-8" });
-  if (!(navigator.sendBeacon && navigator.sendBeacon(SCRIPT_URL, blob))) {
-    fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", keepalive: true,
-      headers: { "Content-Type": "text/plain;charset=utf-8" }, body: datos }).catch(() => {});
-  }
+  // text/plain evita el bloqueo CORS de Google Apps Script.
+  // Primero fetch normal (los bloqueadores de anuncios suelen bloquear sendBeacon
+  // sin avisar); si fetch falla, se intenta con sendBeacon como respaldo.
+  fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", keepalive: true,
+    headers: { "Content-Type": "text/plain;charset=utf-8" }, body: datos })
+    .catch(() => {
+      try { navigator.sendBeacon(SCRIPT_URL, new Blob([datos], { type: "text/plain;charset=utf-8" })); } catch (e) {}
+    });
 }
 
 /* ---------- Especificaciones del dispositivo ---------- */
