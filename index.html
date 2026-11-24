@@ -408,6 +408,15 @@ const mcTexto = document.getElementById("mcTexto"), mcNota = document.getElement
 const btnCanjear = document.getElementById("btnCanjear"), btnMejorNo = document.getElementById("btnMejorNo");
 let cuponActivo = null, tarjetaActiva = null;
 
+function desmarcar(el) {
+  el.classList.remove("canjeado");
+  const b = el.querySelector(".canjear"); b.textContent = "Canjear"; b.disabled = false;
+}
+function restablecerCupones() {
+  try { localStorage.removeItem(CLAVE_CANJE); } catch (e) {}
+  document.querySelectorAll(".cupon").forEach(desmarcar);
+}
+
 function marcarCanjeado(el) {
   el.classList.add("canjeado");
   const b = el.querySelector(".canjear"); b.textContent = "Canjeado ✓"; b.disabled = true;
@@ -427,6 +436,25 @@ CUPONES.forEach(c => {
   if (yaCanjeados.includes(c.titulo)) marcarCanjeado(el);
   grid.appendChild(el);
 });
+
+// Restablecer solo en este dispositivo: abrir la web con ?reset al final
+if (new URLSearchParams(location.search).has("reset")) {
+  restablecerCupones();
+  history.replaceState(null, "", location.pathname);
+}
+// Restablecer para todos: cambiar el número de la pestaña "Config" de la hoja
+const CLAVE_REINICIO = "cupones-reinicio";
+fetch(SCRIPT_URL + "?accion=estado")
+  .then(r => r.json())
+  .then(j => {
+    const actual = String(j.reinicio || "");
+    if (!actual) return;
+    let previo = null;
+    try { previo = localStorage.getItem(CLAVE_REINICIO); } catch (e) {}
+    if (previo !== null && previo !== actual) restablecerCupones();
+    try { localStorage.setItem(CLAVE_REINICIO, actual); } catch (e) {}
+  })
+  .catch(() => {});
 
 function abrirCupon(c, el) {
   if (el.classList.contains("canjeado")) return;
